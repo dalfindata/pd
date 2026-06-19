@@ -1,0 +1,85 @@
+name: Dalfin CI
+
+on:
+  pull_request:
+    branches:
+      - master
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pd-build:
+    name: pd-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: "1.25.10"
+
+      - name: Capture environment metadata
+        run: |
+          {
+            echo "repo=${GITHUB_REPOSITORY}"
+            echo "ref=${GITHUB_REF}"
+            echo "sha=${GITHUB_SHA}"
+            go version
+          } > pd-build-environment.txt
+
+      - name: Build PD
+        run: |
+          set -euo pipefail
+          make build 2>&1 | tee pd-build.log
+
+      - name: Upload build artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pd-build-${{ github.sha }}
+          if-no-files-found: warn
+          path: |
+            pd-build.log
+            pd-build-environment.txt
+            bin/pd-server
+            bin/pd-ctl
+            bin/pd-recover
+
+  pd-fast-check:
+    name: pd-fast-check
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: "1.25.10"
+
+      - name: Run fast package tests
+        run: |
+          set -euo pipefail
+          go test ./client/... ./pkg/... 2>&1 | tee pd-fast-check.log
+
+      - name: Upload check artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pd-fast-check-${{ github.sha }}
+          if-no-files-found: warn
+          path: |
+            pd-fast-check.log
