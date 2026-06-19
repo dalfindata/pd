@@ -73,7 +73,7 @@ jobs:
       - name: Run fast package tests
         run: |
           set -euo pipefail
-          go test ./client/... ./pkg/... 2>&1 | tee pd-fast-check.log
+          make basic-test 2>&1 | tee pd-fast-check.log
 
       - name: Upload check artifacts
         if: always()
